@@ -477,7 +477,16 @@
         <div>
             <div class="cert-header">
                 <div>Memo No: <span id="certSlNo" class="fill-blank">TFHS/2026/20</span></div>
-                <div>Date: <span id="certTodayDate" class="fill-blank">30-06-2026</span></div>
+                <div><p>Date: <span id="today"></span></p>
+
+<script>
+const today = new Date();
+const dd = String(today.getDate()).padStart(2, '0');
+const mm = String(today.getMonth() + 1).padStart(2, '0');
+const yyyy = today.getFullYear();
+
+document.getElementById("today").textContent = `${dd}-${mm}-${yyyy}`;
+</script></div>
                 <div style="font-size: 7.5pt;">
                     Index: U1-083 &nbsp;|&nbsp; HS Code: 114071 &nbsp;|&nbsp; VTC: 5006
                 </div>
