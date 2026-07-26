@@ -76,6 +76,19 @@
         gap: 6px;
         margin-bottom: 5px;
     }
+    
+    /* VERTICAL GRID ALIGNMENT FOR M.P. & H.S. PANELS */
+    .panel-grid-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        background: #dad7cd;
+        padding: 6px;
+        border-radius: 4px;
+        margin-bottom: 6px;
+        border: 1px solid #c1bdb2;
+    }
+    
     .form-group {
         display: flex;
         flex-direction: column;
@@ -83,12 +96,15 @@
     }
     .form-group.flex-2 { flex: 2; }
     .form-group.flex-3 { flex: 3; }
+    .form-group.span-2 { grid-column: span 2; }
+    .form-group.span-3 { grid-column: span 3; }
     
     .form-group label {
         font-size: 7.5pt;
         font-weight: bold;
         margin-bottom: 1px;
         color: #1a3a5f;
+        white-space: nowrap;
     }
     .form-group input, .form-group select {
         padding: 2px 4px;
@@ -98,6 +114,7 @@
         background-color: #fff;
         color: #0b2240;
         height: 23px;
+        width: 100%;
     }
     
     .rec-sig-box {
@@ -124,16 +141,15 @@
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        max-width: 530px; /* Constrains boundaries strictly to clear right margin rollers */
+        max-width: 530px;
         overflow: hidden;
     }
     
-    /* ENLARGED RELOCATED DIB TRACK - NO UNDERLINE, PLACED HIGHER UP */
     .memo-header {
         display: grid;
         grid-template-columns: 10% 55% 35%;
         font-family: 'Times New Roman', Times, serif;
-        font-size: 13.5pt; /* More Prominent Size */
+        font-size: 13.5pt;
         font-weight: bold;
         color: #0b2240;
         padding: 4px 0;
@@ -141,7 +157,6 @@
         margin-bottom: 2px;
     }
     
-    /* DOUBLE DOTTED DECORATIVE BORDER BLOCK */
     .double-dotted-separator {
         border-top: 3px dotted #0b2240;
         border-bottom: 1px dotted #0b2240;
@@ -189,10 +204,9 @@
         color: #0b2240;
     }
 
-    /* SLIGHTLY SMALLER, REFINED TYPOGRAPHY FOR PRIMARY CONTENT */
     .text-block-ten-lines {
         font-size: 11.5pt;
-        font-style: italic; /* Styled italic face option */
+        font-style: italic;
         line-height: 1.65;
         text-align: justify;
         color: #111;
@@ -229,7 +243,6 @@
         color: #0b2240;
     }
     
-    /* REWORKED TABLE BORDERS AND HEADERS: BLACK ON WHITE, CORE SIMPLE BOX RECTANGLE */
     .matrix-table {
         width: 100%;
         border-collapse: collapse;
@@ -409,7 +422,8 @@
                 </div>
             </div>
 
-            <div class="form-line-row" id="panelMPRow" style="background:#dad7cd; padding:2px; border-radius:3px;">
+            <!-- M.P. SECTION REORGANIZED IN A CLEAN 3-COLUMN VERTICAL GRID -->
+            <div class="panel-grid-row" id="panelMPRow">
                 <div class="form-group">
                     <label>M.P. Class</label>
                     <select id="inputClassMP" onchange="updateCert()">
@@ -425,20 +439,21 @@
                     <input type="text" id="inputMPYear" value="1985" oninput="updateCert()">
                 </div>
                 <div class="form-group">
-                    <label>M.P. Adm Date</label>
-                    <input type="text" id="inputAdmDateMP" value="02-01-1980" oninput="updateCert()">
-                </div>
-                <div class="form-group">
-                    <label>M.P. Score</label>
-                    <input type="text" id="inputMPScore" value="475 Out of 700" oninput="updateCert()">
-                </div>
-                <div class="form-group">
                     <label>M.P. Adm Sl</label>
                     <input type="text" id="inputRegSlMP" value="104" oninput="updateCert()">
                 </div>
+                <div class="form-group">
+                    <label>M.P. Adm Date</label>
+                    <input type="text" id="inputAdmDateMP" value="02-01-1980" oninput="updateCert()">
+                </div>
+                <div class="form-group span-2">
+                    <label>M.P. Score</label>
+                    <input type="text" id="inputMPScore" value="475 Out of 700" oninput="updateCert()">
+                </div>
             </div>
 
-            <div class="form-line-row" id="panelHSRow" style="background:#dad7cd; padding:2px; border-radius:3px;">
+            <!-- H.S. SECTION REORGANIZED IN A MATCHING 3-COLUMN VERTICAL GRID -->
+            <div class="panel-grid-row" id="panelHSRow">
                 <div class="form-group">
                     <label>H.S. Class</label>
                     <select id="inputClassHS" onchange="updateCert()">
@@ -450,16 +465,16 @@
                     <input type="text" id="inputHSYear" value="1987" oninput="updateCert()">
                 </div>
                 <div class="form-group">
+                    <label>H.S. Adm Sl</label>
+                    <input type="text" id="inputRegSlHS" value="45" oninput="updateCert()">
+                </div>
+                <div class="form-group">
                     <label>H.S. Adm Date</label>
                     <input type="text" id="inputAdmDateHS" value="15-06-1985" oninput="updateCert()">
                 </div>
-                <div class="form-group">
+                <div class="form-group span-2">
                     <label>H.S. Score</label>
                     <input type="text" id="inputHSScore" value="480 Out of 500" oninput="updateCert()">
-                </div>
-                <div class="form-group">
-                    <label>H.S. Adm Sl</label>
-                    <input type="text" id="inputRegSlHS" value="45" oninput="updateCert()">
                 </div>
             </div>
         </div>
@@ -576,7 +591,6 @@
     const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-    // Load saved tracking serial number or fallback safely to starting setup
     window.addEventListener('DOMContentLoaded', (event) => {
         let savedSl = localStorage.getItem('lastMatrixSlNo');
         if (savedSl) {
@@ -587,7 +601,6 @@
         updateCert();
     });
 
-    // Automatically trigger native layout spool, bump count, and sync state engine
     function printAndIncrement() {
         window.print();
         
@@ -658,7 +671,6 @@
     function toggleTrackView() {
         let mode = document.getElementById('inputTrackMode').value;
         
-        // Certificate Output Elements
         let certMpRow = document.getElementById('certRowMP');
         let certHsRow = document.getElementById('certRowHS');
         let certMpMarksRow = document.getElementById('certRowMPMarks');
@@ -666,7 +678,6 @@
         let certMpSegment = document.getElementById('certTrackSegment');
         let certHsSegment = document.getElementById('certHSSegment');
         
-        // Counterfoil Input Panels
         let panelMpRow = document.getElementById('panelMPRow');
         let panelHsRow = document.getElementById('panelHSRow');
         let panelStreamRow = document.getElementById('panelStreamRow');
@@ -680,7 +691,7 @@
             certHsSegment.style.display = 'inline';
             
             panelMpRow.style.display = 'none';
-            panelHsRow.style.display = 'flex';
+            panelHsRow.style.display = 'grid';
             panelStreamRow.style.display = 'flex';
         } else if (mode === "MP Only") {
             certMpRow.style.display = 'table-row';
@@ -690,11 +701,10 @@
             certMpSegment.style.display = 'inline';
             certHsSegment.style.display = 'none';
             
-            panelMpRow.style.display = 'flex';
+            panelMpRow.style.display = 'grid';
             panelHsRow.style.display = 'none';
-            panelStreamRow.style.display = 'none'; // Stream not applicable to MP
+            panelStreamRow.style.display = 'none';
         } else {
-            // Dual Track Mode
             certMpRow.style.display = 'table-row';
             certHsRow.style.display = 'table-row';
             certMpMarksRow.style.display = 'block';
@@ -702,8 +712,8 @@
             certMpSegment.style.display = 'inline';
             certHsSegment.style.display = 'inline';
             
-            panelMpRow.style.display = 'flex';
-            panelHsRow.style.display = 'flex';
+            panelMpRow.style.display = 'grid';
+            panelHsRow.style.display = 'grid';
             panelStreamRow.style.display = 'flex';
         }
     }
