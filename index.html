@@ -392,7 +392,7 @@
                 </div>
                 <div class="form-group">
                     <label>Leaving Date</label>
-                    <input type="text" id="inputLeaving" value="30-06-2026" oninput="updateCert()">
+                    <input type="text" id="inputLeaving" value="30-06-2026" oninput="autoDeriveHSDefaults(); updateCert();">
                 </div>
             </div>
 
@@ -634,6 +634,7 @@
         document.getElementById('inputBSID').value = match.code;
         document.getElementById('inputHSScore').value = `${match.marksObtained}/${match.marksTotal}`;
         document.getElementById('inputLeaving').value = match.leavingDate;
+        autoDeriveHSDefaults();
 
         // TC register carries HS-track data only; switch to HS Only view so the
         // fetched fields map cleanly. User can still switch modes manually after.
@@ -783,6 +784,27 @@
     // Blank/NA check shared by admission-record visibility logic
     function isBlankOrNA(val) {
         return !val || val.trim() === '' || val.trim().toUpperCase() === 'NA';
+    }
+    
+    // H.S. Pass Yr and H.S. Adm Date are DEFAULTS derived from the Leaving Date
+    // whenever it changes: Pass Yr = Leaving Date's year; Adm Date (Class XI
+    // admission) = same day/month as Leaving Date, but 2 years earlier
+    // (typical XI+XII duration). Both remain plain editable fields afterward —
+    // this only re-suggests the value each time Leaving Date itself changes.
+    function autoDeriveHSDefaults() {
+        let leavingVal = document.getElementById('inputLeaving').value;
+        if (!leavingVal) return;
+        
+        let parts = leavingVal.split('-');
+        if (parts.length !== 3) return;
+        
+        let dd = parts[0];
+        let mm = parts[1];
+        let yyyy = parseInt(parts[2]);
+        if (isNaN(yyyy)) return;
+        
+        document.getElementById('inputHSYear').value = yyyy;
+        document.getElementById('inputAdmDateHS').value = `${dd}-${mm}-${yyyy - 2}`;
     }
     
     // Determines per-row visibility (MP / HS) for the Institutional Admission
