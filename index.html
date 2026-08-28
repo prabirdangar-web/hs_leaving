@@ -535,31 +535,33 @@
             </div>
             
             <div class="admission-box">
-                <div class="admission-title">Institutional Admission Records:</div>
-                <table class="matrix-table">
-                    <thead>
-                        <tr>
-                            <th>Academic Track / Course</th>
-                            <th>Class Admitted</th>
-                            <th>Admission Date</th>
-                            <th>Admission Register Sl No</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr id="certRowMP">
-                            <td><strong>M.P.(S.E.)</strong></td>
-                            <td><span id="certClassMP">Class-V</span></td>
-                            <td><span id="certAdmDateMP"></span></td>
-                            <td><span id="certRegSlMP"></span></td>
-                        </tr>
-                        <tr id="certRowHS">
-                            <td><strong>H.S.</strong></td>
-                            <td><span id="certClassHS">Class-XI</span></td>
-                            <td><span id="certAdmDateHS"></span></td>
-                            <td><span id="certRegSlHS"></span></td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div id="certAdmRecordsBlock">
+                    <div class="admission-title">Institutional Admission Records:</div>
+                    <table class="matrix-table">
+                        <thead>
+                            <tr>
+                                <th>Academic Track / Course</th>
+                                <th>Class Admitted</th>
+                                <th>Admission Date</th>
+                                <th>Admission Register Sl No</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr id="certRowMP">
+                                <td><strong>M.P.(S.E.)</strong></td>
+                                <td><span id="certClassMP">Class-V</span></td>
+                                <td><span id="certAdmDateMP"></span></td>
+                                <td><span id="certRegSlMP"></span></td>
+                            </tr>
+                            <tr id="certRowHS">
+                                <td><strong>H.S.</strong></td>
+                                <td><span id="certClassHS">Class-XI</span></td>
+                                <td><span id="certAdmDateHS"></span></td>
+                                <td><span id="certRegSlHS"></span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
                 
                 <div id="certBSIDRow" style="font-size: 12pt; margin-top: 4px;">
                     <strong>Banglar Shiksha Portal ID:</strong> <span id="certBSID" class="fill-blank" style="font-family:monospace; letter-spacing:0.5px;"></span>
@@ -733,8 +735,6 @@
         let mode = document.getElementById('inputTrackMode').value;
         
         // Certificate Output Elements
-        let certMpRow = document.getElementById('certRowMP');
-        let certHsRow = document.getElementById('certRowHS');
         let certMpMarksRow = document.getElementById('certRowMPMarks');
         let certHsMarksRow = document.getElementById('certRowHSMarks');
         let certMpSegment = document.getElementById('certTrackSegment');
@@ -746,8 +746,6 @@
         let panelStreamRow = document.getElementById('panelStreamRow');
         
         if (mode === "HS Only") {
-            certMpRow.style.display = 'none';
-            certHsRow.style.display = 'table-row';
             certMpMarksRow.style.display = 'none';
             certHsMarksRow.style.display = 'block';
             certMpSegment.style.display = 'none';
@@ -757,8 +755,6 @@
             panelHsRow.style.display = 'flex';
             panelStreamRow.style.display = 'flex';
         } else if (mode === "MP Only") {
-            certMpRow.style.display = 'table-row';
-            certHsRow.style.display = 'none';
             certMpMarksRow.style.display = 'block';
             certHsMarksRow.style.display = 'none';
             certMpSegment.style.display = 'inline';
@@ -769,8 +765,6 @@
             panelStreamRow.style.display = 'none'; // Stream not applicable to MP
         } else {
             // Dual Track Mode
-            certMpRow.style.display = 'table-row';
-            certHsRow.style.display = 'table-row';
             certMpMarksRow.style.display = 'block';
             certHsMarksRow.style.display = 'block';
             certMpSegment.style.display = 'inline';
@@ -780,6 +774,43 @@
             panelHsRow.style.display = 'flex';
             panelStreamRow.style.display = 'flex';
         }
+        
+        // Institutional Admission Records rows/section depend on both
+        // track mode AND whether each row's own data is blank - handled here.
+        updateAdmissionRecords();
+    }
+    
+    // Blank/NA check shared by admission-record visibility logic
+    function isBlankOrNA(val) {
+        return !val || val.trim() === '' || val.trim().toUpperCase() === 'NA';
+    }
+    
+    // Determines per-row visibility (MP / HS) for the Institutional Admission
+    // Records table, then collapses the whole title+table block if both
+    // rows end up hidden. Track Mode gates each row first; independently,
+    // each row also hides itself if its own Adm Date AND Adm Sl are both
+    // blank/NA. The BSID line is untouched and keeps its own rule elsewhere.
+    function updateAdmissionRecords() {
+        let mode = document.getElementById('inputTrackMode').value;
+        let modeAllowsMP = (mode !== "HS Only");
+        let modeAllowsHS = (mode !== "MP Only");
+        
+        let admDateMP = document.getElementById('inputAdmDateMP').value;
+        let regSlMP = document.getElementById('inputRegSlMP').value;
+        let admDateHS = document.getElementById('inputAdmDateHS').value;
+        let regSlHS = document.getElementById('inputRegSlHS').value;
+        
+        let mpRowBlank = isBlankOrNA(admDateMP) && isBlankOrNA(regSlMP);
+        let hsRowBlank = isBlankOrNA(admDateHS) && isBlankOrNA(regSlHS);
+        
+        let showMPRow = modeAllowsMP && !mpRowBlank;
+        let showHSRow = modeAllowsHS && !hsRowBlank;
+        
+        document.getElementById('certRowMP').style.display = showMPRow ? 'table-row' : 'none';
+        document.getElementById('certRowHS').style.display = showHSRow ? 'table-row' : 'none';
+        
+        // Whole-section hide: title + table disappear together when both rows are empty
+        document.getElementById('certAdmRecordsBlock').style.display = (showMPRow || showHSRow) ? 'block' : 'none';
     }
 
     function updateCert() {
@@ -850,6 +881,8 @@
         document.getElementById('certClassHS').innerText = "Class-" + document.getElementById('inputClassHS').value;
         document.getElementById('certAdmDateHS').innerText = document.getElementById('inputAdmDateHS').value;
         document.getElementById('certRegSlHS').innerText = document.getElementById('inputRegSlHS').value;
+
+        updateAdmissionRecords();
 
         let sexVal = document.getElementById('inputSex').value;
         let subParent = sexVal === "Female" ? "Daughter" : "Son";
