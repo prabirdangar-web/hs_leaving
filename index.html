@@ -631,8 +631,8 @@
                     <input type="text" id="inputSlNo" value="20" oninput="updateCert()">
                 </div>
                 <div class="form-group">
-                    <label>Gender / Sex</label>
-                    <select id="inputSex" onchange="updateCert()">
+                    <label>Gender / Sex <span id="sexWarn" style="display:none; color:#d35400; font-weight:bold;" title="Not stored in database — confirm manually">⚠ confirm</span></label>
+                    <select id="inputSex" onchange="this.style.outline=''; this.style.background=''; document.getElementById('sexWarn').style.display='none'; updateCert()">
                         <option value="Male" selected>Male</option>
                         <option value="Female">Female</option>
                     </select>
@@ -878,7 +878,8 @@
     </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
     function updateDbStatus() {
         const el = document.getElementById('dbStatus');
         if (!el || typeof STUDENTS === 'undefined') return;
@@ -1018,10 +1019,30 @@
         }
         toggleTrackView();
 
+        // Sex/Gender is NOT stored in the TC Register database (no record has
+        // it), so it is never guessed from the name — that would risk printing
+        // the wrong Son/Daughter + his/her/He/She wording on an official
+        // certificate. Instead the field is visibly flagged so it can never be
+        // missed and silently left on its previous value.
+        const sexKnown = (match.sex !== undefined && match.sex !== null && String(match.sex).trim() !== '') ||
+                         (match.gender !== undefined && match.gender !== null && String(match.gender).trim() !== '');
+        const sexSelectEl = document.getElementById('inputSex');
+        const sexWarnEl = document.getElementById('sexWarn');
+        if (!sexKnown) {
+            sexSelectEl.style.outline = '2px solid #d35400';
+            sexSelectEl.style.background = '#fff3cd';
+            if (sexWarnEl) sexWarnEl.style.display = 'inline';
+        } else {
+            sexSelectEl.style.outline = '';
+            sexSelectEl.style.background = '';
+            if (sexWarnEl) sexWarnEl.style.display = 'none';
+        }
+
         statusEl.innerText =
             `Autofetched: ${match.name} — Student Code ${match.code}. ` +
-            `All available database fields fetched; fields remain editable.`;
-        statusEl.style.color = '#1a6f1a';
+            `All available database fields fetched; fields remain editable.` +
+            (sexKnown ? '' : ' ⚠ Gender/Sex is not stored in the database — please confirm it manually before printing.');
+        statusEl.style.color = sexKnown ? '#1a6f1a' : '#a05a00';
 
         updateCert();
         syncDobToCertificate();
@@ -1263,15 +1284,6 @@ function updateCert() {
         document.getElementById('certStudentCode').innerText = studentCodeVal;
         document.getElementById('certStudentCodeRow').style.display = studentCodeVal ? 'block' : 'none';
 
-        let bsidVal = document.getElementById('inputStudentCode').value;
-        let bsidRow = document.getElementById('certBSIDRow');
-        if (!bsidVal || bsidVal.trim().toUpperCase() === 'NA' || bsidVal.trim() === '') {
-            bsidRow.style.display = 'none';
-        } else {
-            bsidRow.style.display = 'block';
-            document.getElementById('certBSID').innerText = bsidVal;
-        }
-        
         let cat = document.getElementById('inputCategory').value;
         document.getElementById('certCatText1').innerText = cat;
         document.getElementById('certCatText2').innerText = cat;
