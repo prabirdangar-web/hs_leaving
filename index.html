@@ -921,61 +921,106 @@
     // so it never fires halfway through manual typing. Nothing here is forced —
     // every field it fills remains a normal manual input the user can retype.
     function autofetchStudent() {
-        let raw = document.getElementById('studentSearch').value.trim();
-        let statusEl = document.getElementById('autofetchStatus');
-        if (!raw) { statusEl.innerText = ''; return; }
+        const q = (document.getElementById('studentSearch').value || '').trim().toUpperCase();
+        const statusEl = document.getElementById('autofetchStatus');
+        if (!q) { statusEl.innerText = ''; return; }
 
-        // Exact dropdown selection: Name (Banglar Shiksha Portal ID).
-        // Also allow the 14-digit Student Code to be typed directly.
-        let match = STUDENTS.find(s => studentLabel(s) === raw) ||
-                    STUDENTS.find(s => s.code === raw);
-
-        // If a name with a Student Code in brackets is pasted/selected, recover the
-        // bracketed Student Code as a final fallback.
-        if (!match) {
-            const mm = raw.match(/^(.+?)\s*\(([^()]*)\)\s*$/);
-            if (mm) {
-                const nm = mm[1].trim().toUpperCase();
-                const bracketCode = mm[2].trim();
-                match = STUDENTS.find(s => s.name.toUpperCase() === nm && s.code === bracketCode);
-            }
-        }
+        const match = STUDENTS.find(s =>
+            String(s.code || '').toUpperCase() === q ||
+            String(s.name || '').toUpperCase() === q
+        ) || STUDENTS.find(s =>
+            String(s.code || '').toUpperCase().includes(q) ||
+            String(s.name || '').toUpperCase().includes(q)
+        );
 
         if (!match) {
-            statusEl.innerText = 'Select a student from the list — the Banglar Shiksha Portal Student Code is shown in brackets and will autofill automatically.';
-            statusEl.style.color = '#7a5c00';
+            statusEl.innerText = 'No matching student found. Check Student Code / name.';
+            statusEl.style.color = '#b00020';
             return;
         }
 
-        document.getElementById('inputName').value = match.name;
+        // Core TC fields
+        document.getElementById('inputName').value = match.name || '';
         document.getElementById('inputStudentCode').value = match.code || '';
-        document.getElementById('inputFather').value = match.father;
-        document.getElementById('inputVillage').value = match.village;
-        document.getElementById('inputPO').value = match.po;
-        document.getElementById('inputPS').value = match.ps;
-        document.getElementById('inputDist').value = match.district;
-        document.getElementById('inputPIN').value = match.pin;
-        (function(){
-            const d = String(match.dob || '').trim();
-            let iso = d;
-            let m = d.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
-            if (m) iso = `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+        document.getElementById('inputFather').value = match.father || '';
+        document.getElementById('inputVillage').value = match.village || '';
+        document.getElementById('inputPO').value = match.po || '';
+        document.getElementById('inputPS').value = match.ps || '';
+        document.getElementById('inputDist').value = match.district || '';
+        document.getElementById('inputPIN').value = match.pin || '';
+
+        // DOB: database is expected to use YYYY-MM-DD; also tolerate DD-MM-YYYY,
+        // DD/MM/YYYY and textual dates where the browser can parse them.
+        const d = String(match.dob || '').trim();
+        let iso = d;
+        let dm = d.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+        if (dm) iso = `${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
             document.getElementById('inputDOB').value = iso;
-        })();
-        // Student Code and Banglar Shiksha Portal ID are separate fields.
-        // The common school Portal/DISE value is retained in the BSID field.
-        document.getElementById('inputStudentCode').value = match.code || ''; document.getElementById('inputBSID').value = match.code || '';
-        document.getElementById('inputHSScore').value = `${match.marksObtained}/${match.marksTotal}`;
-        document.getElementById('inputLeaving').value = match.leavingDate;
+        }
+
+        if (match.marksObtained != null && match.marksObtained !== '') {
+            document.getElementById('inputHSScore').value =
+                `${match.marksObtained}/${match.marksTotal || ''}`.replace(/\/$/, '');
+        }
+        if (match.leavingDate) document.getElementById('inputLeaving').value = match.leavingDate;
+
+        // Fetch optional fields when they genuinely exist in the database.
+        // Do NOT invent values and do NOT copy the school DISE code into a
+        // student field.
+        const optionalMap = {
+            sex: 'inputSex',
+            gender: 'inputSex',
+            category: 'inputCategory',
+            enrollmentCategory: 'inputCategory',
+            stream: 'inputStream',
+            streamCourse: 'inputStream',
+            trackMode: 'inputTrackMode',
+            mpYear: 'inputMPYear',
+            mpPassYear: 'inputMPYear',
+            hsYear: 'inputHSYear',
+            hsPassYear: 'inputHSYear',
+            admDateMP: 'inputAdmDateMP',
+            mpAdmissionDate: 'inputAdmDateMP',
+            regSlMP: 'inputRegSlMP',
+            mpAdmSl: 'inputRegSlMP',
+            admDateHS: 'inputAdmDateHS',
+            hsAdmissionDate: 'inputAdmDateHS',
+            regSlHS: 'inputRegSlHS',
+            hsAdmSl: 'inputRegSlHS',
+            classMP: 'inputClassMP',
+            classHS: 'inputClassHS',
+            mpScore: 'inputMPScore',
+            mpMarks: 'inputMPScore',
+            hsScore: 'inputHSScore',
+            hsMarks: 'inputHSScore',
+            memo: 'inputMemo',
+            memoDate: 'inputMemoDate'
+        };
+
+        Object.entries(optionalMap).forEach(([key, id]) => {
+            if (match[key] !== undefined && match[key] !== null && String(match[key]).trim() !== '') {
+                const el = document.getElementById(id);
+                if (el) el.value = match[key];
+            }
+        });
+
+        // Keep the genuine Student Code as the single student identifier.
+        const hiddenCompat = document.getElementById('inputBSID');
+        if (hiddenCompat) hiddenCompat.value = match.code || '';
+
         autoDeriveHSDefaults();
         syncDobToCertificate();
 
-        // TC register carries HS-track data only; switch to HS Only view so the
-        // fetched fields map cleanly. User can still switch modes manually after.
-        document.getElementById('inputTrackMode').value = 'HS Only';
+        // TC register is HS-track data when no explicit track mode exists.
+        if (!match.trackMode) {
+            document.getElementById('inputTrackMode').value = 'HS Only';
+        }
         toggleTrackView();
 
-        statusEl.innerText = `Autofetched: ${match.name} — Student Code ${match.code} — Banglar Shiksha Portal Student Code ${match.code || ''}. All fields remain editable.`;
+        statusEl.innerText =
+            `Autofetched: ${match.name} — Student Code ${match.code}. ` +
+            `All available database fields fetched; fields remain editable.`;
         statusEl.style.color = '#1a6f1a';
 
         updateCert();
