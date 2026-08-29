@@ -922,17 +922,31 @@
     // so it never fires halfway through manual typing. Nothing here is forced —
     // every field it fills remains a normal manual input the user can retype.
     function autofetchStudent() {
-        const q = (document.getElementById('studentSearch').value || '').trim().toUpperCase();
+        const raw = (document.getElementById('studentSearch').value || '').trim();
+        const q = raw.toUpperCase();
         const statusEl = document.getElementById('autofetchStatus');
         if (!q) { statusEl.innerText = ''; return; }
 
-        const match = STUDENTS.find(s =>
-            String(s.code || '').toUpperCase() === q ||
-            String(s.name || '').toUpperCase() === q
-        ) || STUDENTS.find(s =>
-            String(s.code || '').toUpperCase().includes(q) ||
-            String(s.name || '').toUpperCase().includes(q)
-        );
+        // The datalist offers suggestions in "Name (Code)" form (see
+        // studentLabel()). Picking one fills the box with that exact string,
+        // so it must be recognized directly — not just a bare code or name.
+        const parenMatch = raw.match(/^(.*)\s*\(([^)]+)\)\s*$/);
+
+        let match =
+            // 1) Exact "Name (Code)" label as offered by the datalist.
+            (parenMatch && STUDENTS.find(s => studentLabel(s).toUpperCase() === q)) ||
+            // 2) Exact bare Student Code or exact bare Name.
+            STUDENTS.find(s =>
+                String(s.code || '').toUpperCase() === q ||
+                String(s.name || '').toUpperCase() === q
+            ) ||
+            // 3) The code pulled out of "(...)", in case the label got edited.
+            (parenMatch && STUDENTS.find(s => String(s.code || '').toUpperCase() === parenMatch[2].trim().toUpperCase())) ||
+            // 4) Partial/substring match while the user is still typing.
+            STUDENTS.find(s =>
+                String(s.code || '').toUpperCase().includes(q) ||
+                String(s.name || '').toUpperCase().includes(q)
+            );
 
         if (!match) {
             statusEl.innerText = 'No matching student found. Check Student Code / name.';
