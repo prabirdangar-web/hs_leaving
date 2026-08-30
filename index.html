@@ -128,6 +128,34 @@
         justify-content: space-between;
         max-width: 100%;
         overflow: hidden;
+        position: relative;
+    }
+
+    /* Very faint school-name watermark behind the certificate text.
+       Uses text color (not a background), so it still prints normally
+       even without forcing background color printing. */
+    .main-certificate .cert-watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-32deg);
+        width: 130%;
+        text-align: center;
+        font-family: 'Times New Roman', Times, serif;
+        font-weight: bold;
+        font-size: 40pt;
+        line-height: 1.3;
+        color: #0b2240;
+        opacity: 0.045;
+        pointer-events: none;
+        user-select: none;
+        white-space: nowrap;
+        z-index: 0;
+        margin: 0;
+    }
+    .main-certificate > div:not(.cert-watermark), .main-certificate > .cert-footer {
+        position: relative;
+        z-index: 1;
     }
     
     /* ENLARGED RELOCATED DIB TRACK - NO UNDERLINE, PLACED HIGHER UP */
@@ -174,6 +202,11 @@
         text-transform: uppercase;
         margin: 0;
         letter-spacing: 0.5px;
+    }
+    .school-title-bengali {
+        font-size: 13pt;
+        font-weight: bold;
+        margin: 2px 0 0 0;
     }
     .school-subtitle {
         font-size: 13pt;
@@ -255,10 +288,28 @@
     .cert-footer {
         margin-top: 10px;
         display: grid;
-        grid-template-columns: 50% 50%;
+        grid-template-columns: 38% 24% 38%;
         align-items: flex-end;
         font-size: 9.5pt;
         color: #0b2240;
+    }
+    .qr-verify-block {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+    .qr-verify-block img {
+        width: 52px;
+        height: 52px;
+        display: block;
+    }
+    .qr-verify-caption {
+        font-size: 6.5pt;
+        font-weight: bold;
+        text-align: center;
+        color: #1a3a5f;
+        letter-spacing: 0.2px;
     }
     .seal-block {
         display: flex;
@@ -309,9 +360,11 @@
         .form-group label { font-size: 6.5pt; line-height: 1.05; overflow-wrap: anywhere; }
         .form-group input, .form-group select { width: 100%; min-width: 0; max-width: 100%; height: 21px; padding: 1px 3px; font-size: 7.5pt; }
         .main-certificate { padding: 5px 6px; border-width: 2px; overflow: hidden; }
+        .cert-watermark { font-size: 16pt; }
         .memo-header { grid-template-columns: 12% 53% 35%; font-size: 7pt; }
         .cert-header { font-size: 6.5pt; }
         .school-title { font-size: 8pt; letter-spacing: 0; }
+        .school-title-bengali { font-size: 7pt; margin-top: 1px; }
         .school-subtitle { font-size: 7pt; margin-top: 2px; }
         .cert-title { font-size: 7.5pt; margin: 5px 0 3px; }
         .text-block-ten-lines { font-size: 7pt; line-height: 1.3; overflow-wrap: anywhere; word-break: break-word; }
@@ -319,9 +372,11 @@
         .admission-title { font-size: 6.5pt; }
         .matrix-table { font-size: 6.5pt; table-layout: fixed; word-break: break-word; }
         .matrix-table th, .matrix-table td { padding: 2px; overflow-wrap: anywhere; }
-        .cert-footer { font-size: 6.5pt; grid-template-columns: 50% 50%; gap: 2px; }
+        .cert-footer { font-size: 6.5pt; grid-template-columns: 36% 26% 38%; gap: 2px; }
         .seal-block { gap: 4px; }
         .seal-area { width: 34px; height: 34px; font-size: 5.5pt; }
+        .qr-verify-block img { width: 32px; height: 32px; }
+        .qr-verify-caption { font-size: 5pt; }
         .sig-line { width: 70px; }
         .modal-box { width: 98vw; max-height: 94vh; }
         .modal-header { padding: 8px 10px; font-size: 9pt; }
@@ -335,9 +390,10 @@
             display: none !important;
         }
         body {
-            background-color: #f2f1ed !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            /* No forced page background color on print - keeps plain
+               white paper output and avoids ink/toner print issues.
+               (Screen preview still shows the beige background above.) */
+            background-color: #ffffff !important;
         }
         .wrapper {
             grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr) !important;
@@ -599,7 +655,7 @@
     <div class="dashboard-panel">
         <div>
             <div class="panel-title">School Counterfoil / Foil Logs</div>
-            <div id="dbStatus" class="db-status">Database: nearly 1200 records | Years: 2020 to 2026</div>
+            <div id="dbStatus" class="db-status">Database: nearly 1300 records | Years: 2020 to 2026</div>
 
             <div class="form-line-row" style="background:#fff3cd; padding:4px; border-radius:3px; border:1px solid #d4a017;">
                 <div class="form-group flex-3">
@@ -781,6 +837,7 @@
     </div>
     
     <div class="main-certificate">
+        <div class="cert-watermark" aria-hidden="true">TALDANGRA FULMATI H.S.<br>তালডাংরা ফুলমতি উঃ মাঃ</div>
         <div>
             <div class="cert-header">
                 <div>Memo No: <span id="certSlNo" class="fill-blank">TFHS/2026/20</span></div>
@@ -792,6 +849,7 @@
             
             <div class="school-info">
                 <h1 class="school-title">Taldangra Fulmati High School [H.S.]</h1>
+                <p class="school-title-bengali">তালডাংরা ফুলমতি উচ্চ বিদ্যালয় [উঃ মাঃ]</p>
                 <p class="school-subtitle">P.O. - Taldangra, P.S. - Taldangra, Dist. - Bankura, P.I.N. - 722152 &nbsp; | &nbsp; <strong class="school-dise-code">School DISE/UDISE Code: 19132104401</strong></p>
             </div>
             
@@ -869,6 +927,10 @@
                     <strong>Place:</strong> Taldangra
                 </div>
                 <div class="seal-area">School Seal</div>
+            </div>
+            <div class="qr-verify-block">
+                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAIAAAABc2X6AAAE8ElEQVR4AeyYi25cNxBD3fz/P7snPhtillcrPwo08MoBy3I4HCWaK7SBf7188tfrn18198e+/duuhfpdXobLtAy/e+Y18OkLX4/4Xs7twtnZRtTFKvnP/S+7jqivXF0PMGYLniYtnCvw30WmbhdO/fTi7sKu88qbLSTsjitpt8yUNWLpiBo2rBnWLE63RMXuLly9pyx/Lvzhz+rL4dWJ5Zwtk+Ek40xhN44nhO3+F/75wp/cXj5FzcVHpOWHSrkRJuFN5mutny/8tb19n6m7L8wTWuIL15nn1DiPXOgnOUs1PJOUhhFX2LpyJe8uXL2nLG8XdpF7Xt4/G3W2yuVITMMOwrNMpgQxsDTxN8jI7cKpn178cq8f5/1GsmMPrLDdmFXqO2gLXpYmYbuf4dfzvjB7Ogq/eDZgeWd8YVcd1gzXu4qP2LRmNycj8CdyAq0PYo6jM3Xqk3YBbGIJu655GcA0g5jQLE7AA9O1LDZcGU24wpb4ICMKW/CpX5iVHILdF+YBCHfh21A/YjNhx8NOpTSW0q5msa1PcY5VZHZ34YSeSdxdOHtd3rBWZVkjmvA8IRl8MFvodBU4E+QnzMSZyWi7KUvcXbh6T1med+HlA/Dl1Bdemo6H9yN1glMZmaUatusgXCXOI5gMJ3beF/bqboKNCsuwZrFdx+EqDWuqw4RFdTWNqcOaH2SPLc7seV94biIbnSY6PoJyIpujBdJCg5RLQWBimfH8as0ptF2EcEQdNvPy8nL2F84anljcfqblDX0MsGW9B3wQU2ESpgUQAg3UxfiifMs6VjO87yaG8LcI44ifJ/22hyxG8ea9uF2dsC3YLuIKW+EK5ChFdTOlsGsSttzzHCT584VZwlPj9lNLngfw64dzcVpBzL3wkEwpliMmYbubpIHJM6yGOWpi5tGnPmlXwnomNGEWAxAAMYEj5mC0SQOwZdhYSgUxYCtsK0xA6EytAz+aPfULs5JDcPublg8gd/aRaMKzfJTRN1nMCaIylrZgpxDAFqyJELSA+hETAOmigefApz5prj6R9UxhYDobzVLBJvCpFkcJ/wxqeJbqcM7XSXneF3YBbAtkDWiQUoED1GHHwwSEAfW1W74BR6bGMYmYMAPbRQA1bBJHWOK/vr7C531hF3AO3/63VBf2MYTtWqphnscEziMktjwhU8YsTV7ZrknYUk7Y8hGf/aTZ2RJuy5YadqOIJezKFdAMeyxsDAHUMHoCB2QWDQwghGVxRs7+wm7oufn2A4B88Slyc5+HrTKrNAPrO6iGq8SZYCqIr5OyhF25Wint+lvD5z1pLv0IWZLCmBp2c2GcR0hGkVgdaFls2EHYsjKWtsKERXXP+8JZySFi9x8tn0Rx7cUHAxtDiIotS0c2LQJ2PRO2DBMAKRU4gLBAA1vwqU/aZeyZ9UwYns7UdlktiK+ZUkHgCluwIwngTNidDnpp4otTv7C3zyJL2C02E3O5141pC16egC/sqmFLf+tiW7A+YuLN/E1nf+G5kmfVX//CPDDw+5WMf2pNdpYmLX0OEThAbQvGAQhhN6y5ZKaE3Yx8/cIe9O34b17YLxDe7K4yVdZgPuYUyfzNC+cP8X+Ksy8838DUmy+QmJn9YzNTI1XmBEWNaGZkKcw4eOVTv7Bb2XNtq8LLbn2B/YjhOkczg3ar1NxzRk79wvv1PFP3XwAAAP//MvsCqQAAAAZJREFUAwD/7JW5dhQxLAAAAABJRU5ErkJggg==" alt="Verification QR Code">
+                <span class="qr-verify-caption">Scan to Verify</span>
             </div>
             <div class="signature-area">
                 <div class="sig-line"></div>
