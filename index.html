@@ -442,6 +442,32 @@
         margin-top: 8px;
     }
 
+
+    /* Serial number: manual entry is intentionally highlighted. The value is
+       also synchronised through Firestore so every signed-in browser/device
+       uses the same next serial number. */
+    .manual-sl-input {
+        background: #ffe8cc !important;
+        border: 1.5px solid #e6a15c !important;
+        font-weight: 700;
+    }
+    .manual-sl-input:focus {
+        background: #ffddb3 !important;
+        border-color: #d9822b !important;
+        outline: 2px solid rgba(217,130,43,.18);
+    }
+
+    /* Manual/verification fields: clearly highlighted so they are checked before printing. */
+    .manual-entry-orange {
+        background: #ffe8cc !important;
+        border: 1.5px solid #e6a15c !important;
+    }
+    .manual-entry-orange:focus {
+        background: #ffddb3 !important;
+        border-color: #d9822b !important;
+        outline: 2px solid rgba(217,130,43,.18);
+    }
+
     @media print {
         .action-bar {
             display: none !important;
@@ -756,11 +782,11 @@
             <div class="form-line-row">
                 <div class="form-group">
                     <label>Sl No</label>
-                    <input type="text" id="inputSlNo" value="20" oninput="updateCert()">
+                    <input type="text" id="inputSlNo" class="manual-sl-input" value="100" inputmode="numeric" autocomplete="off" oninput="updateCert()">
                 </div>
                 <div class="form-group">
                     <label>Gender / Sex <span id="sexWarn" style="display:none; color:#d35400; font-weight:bold;" title="Not stored in database — confirm manually">⚠ confirm</span></label>
-                    <select id="inputSex" onchange="this.style.outline=''; this.style.background=''; document.getElementById('sexWarn').style.display='none'; updateCert()">
+                    <select id="inputSex" class="manual-entry-orange" onchange="this.style.outline=''; this.style.background='#ffe8cc'; document.getElementById('sexWarn').style.display='none'; updateCert()">
                         <option value="Male" selected>Male</option>
                         <option value="Female">Female</option>
                     </select>
@@ -829,15 +855,15 @@
             <div class="form-line-row" id="panelStreamRow">
                 <div class="form-group">
                     <label>H.S. Stream Course</label>
-                    <select id="inputStream" onchange="updateCert()">
+                    <select id="inputStream" class="manual-entry-orange" onchange="updateCert()">
                         <option value="General [Science]" selected>General [Science]</option>
                         <option value="General [Arts]">General [Arts]</option>
                         <option value="General [Commerce]">General [Commerce]</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Enrollment Category</label>
-                    <input type="text" id="inputCategory" value="Regular" oninput="updateCert()">
+                    <label>H.S. Enrollment Category</label>
+                    <input type="text" id="inputHSCategory" class="manual-entry-orange" value="Regular" oninput="updateCert()">
                 </div>
             </div>
 
@@ -858,7 +884,7 @@
                 </div>
                 <div class="form-group">
                     <label>M.P. Adm Date</label>
-                    <input type="text" id="inputAdmDateMP" value="02-01-1980" oninput="updateCert()">
+                    <input type="text" id="inputAdmDateMP" class="manual-entry-orange" value="02-01-1980" oninput="updateCert()">
                 </div>
                 <div class="form-group">
                     <label>M.P. Score</label>
@@ -866,7 +892,11 @@
                 </div>
                 <div class="form-group">
                     <label>M.P. Adm Sl</label>
-                    <input type="text" id="inputRegSlMP" value="104" oninput="updateCert()">
+                    <input type="text" id="inputRegSlMP" class="manual-entry-orange" value="104" oninput="updateCert()">
+                </div>
+                <div class="form-group">
+                    <label>M.P. Enrollment Category</label>
+                    <input type="text" id="inputMPCategory" class="manual-entry-orange" value="Regular" oninput="updateCert()">
                 </div>
             </div>
 
@@ -883,7 +913,7 @@
                 </div>
                 <div class="form-group">
                     <label>H.S. Adm Date</label>
-                    <input type="text" id="inputAdmDateHS" value="15-06-1985" oninput="updateCert()">
+                    <input type="text" id="inputAdmDateHS" class="manual-entry-orange" value="15-06-1985" oninput="updateCert()">
                 </div>
                 <div class="form-group">
                     <label>H.S. Score</label>
@@ -891,7 +921,7 @@
                 </div>
                 <div class="form-group">
                     <label>H.S. Adm Sl</label>
-                    <input type="text" id="inputRegSlHS" value="45" oninput="updateCert()">
+                    <input type="text" id="inputRegSlHS" class="manual-entry-orange" value="45" oninput="updateCert()">
                 </div>
             </div>
         </div>
@@ -1232,8 +1262,12 @@
         const optionalMap = {
             sex: 'inputSex',
             gender: 'inputSex',
-            category: 'inputCategory',
-            enrollmentCategory: 'inputCategory',
+            category: 'inputHSCategory',
+            enrollmentCategory: 'inputHSCategory',
+            hsCategory: 'inputHSCategory',
+            hsEnrollmentCategory: 'inputHSCategory',
+            mpCategory: 'inputMPCategory',
+            mpEnrollmentCategory: 'inputMPCategory',
             stream: 'inputStream',
             streamCourse: 'inputStream',
             trackMode: 'inputTrackMode',
@@ -1313,31 +1347,75 @@
         document.getElementById('autofetchStatus').innerText = '';
     }
 
-    // Load saved tracking serial number or fallback safely to starting setup.
-    // (populateStudentDatalist()/updateCert() are NOT called here anymore —
-    // they now run from auth.onAuthStateChanged() above, once the student
-    // database has actually finished loading from Firebase.)
-    window.addEventListener('DOMContentLoaded', (event) => {
-        let savedSl = localStorage.getItem('lastMatrixSlNo');
-        if (savedSl) {
-            document.getElementById('inputSlNo').value = savedSl;
-        } else {
-            document.getElementById('inputSlNo').value = "20";
+    // Global serial number — shared by ALL signed-in browsers/computers.
+    // Firestore transaction prevents two browsers from receiving the same
+    // number when printing at nearly the same time. Manual edits are allowed.
+    const SERIAL_SETTINGS_DOC = 'settings/documentLedger';
+    const SERIAL_START = 100;
+
+    async function getGlobalSerial() {
+        try {
+            const ref = db.doc(SERIAL_SETTINGS_DOC);
+            const snap = await ref.get();
+            if (snap.exists && Number.isFinite(Number(snap.data().nextSl))) {
+                return Number(snap.data().nextSl);
+            }
+            await ref.set({ nextSl: SERIAL_START }, { merge: true });
+            return SERIAL_START;
+        } catch (e) {
+            console.error('Global serial load failed:', e);
+            return SERIAL_START;
         }
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        const input = document.getElementById('inputSlNo');
+        if (!input) return;
+        input.classList.add('manual-sl-input');
+        const sl = await getGlobalSerial();
+        input.value = sl;
+        updateCert();
     });
 
-    // Automatically trigger native layout spool, bump count, and sync state engine
-    function printAndIncrement() {
-        window.print();
-        
-        let currentSlInput = document.getElementById('inputSlNo');
-        let currentSl = parseInt(currentSlInput.value);
-        
-        if (!isNaN(currentSl)) {
-            let nextSl = currentSl + 1;
-            currentSlInput.value = nextSl;
-            localStorage.setItem('lastMatrixSlNo', nextSl);
+    async function printAndIncrement() {
+        const input = document.getElementById('inputSlNo');
+        const manualSl = parseInt(input.value, 10);
+        if (!Number.isFinite(manualSl) || manualSl < 1) {
+            alert('Please enter a valid Sl No.');
+            input.focus();
+            return;
+        }
+
+        const btn = document.querySelector('.action-bar .print-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+
+        try {
+            const ref = db.doc(SERIAL_SETTINGS_DOC);
+            let printedSl;
+            await db.runTransaction(async (tx) => {
+                const snap = await tx.get(ref);
+                const storedNext = snap.exists && Number.isFinite(Number(snap.data().nextSl))
+                    ? Number(snap.data().nextSl) : SERIAL_START;
+                // A manual entry is respected. The central counter is never
+                // allowed to move backwards, so other browsers remain safe.
+                printedSl = manualSl;
+                const nextSl = Math.max(storedNext, manualSl + 1);
+                tx.set(ref, { nextSl: nextSl, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            });
+
+            input.value = printedSl;
             updateCert();
+            window.print();
+
+            // After printing, show the next globally reserved number.
+            const next = await getGlobalSerial();
+            input.value = next;
+            updateCert();
+        } catch (e) {
+            console.error('Global serial update failed:', e);
+            alert('Serial number could not be synchronised with Firebase. Check Firestore Rules/connection.\n\n' + (e.message || e));
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Print Document'; }
         }
     }
 
@@ -1545,9 +1623,10 @@ function updateCert() {
         document.getElementById('certStudentCode').innerText = studentCodeVal;
         document.getElementById('certStudentCodeRow').style.display = studentCodeVal ? 'block' : 'none';
 
-        let cat = document.getElementById('inputCategory').value;
-        document.getElementById('certCatText1').innerText = cat;
-        document.getElementById('certCatText2').innerText = cat;
+        let mpCat = document.getElementById('inputMPCategory').value;
+        let hsCat = document.getElementById('inputHSCategory').value;
+        document.getElementById('certCatText1').innerText = mpCat;
+        document.getElementById('certCatText2').innerText = hsCat;
         
         document.getElementById('certStreamTxt').innerText = document.getElementById('inputStream').value;
         document.getElementById('certMPYearText').innerText = document.getElementById('inputMPYear').value;
