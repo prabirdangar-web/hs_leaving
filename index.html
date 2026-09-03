@@ -1100,6 +1100,17 @@
             await loadStudentsFromFirestore();
             populateStudentDatalist();
             updateDbStatus();
+            // Load the global SL number only after Firebase authentication.
+            // Running this before login causes Firestore permission-denied and
+            // can leave the form incorrectly showing 39.
+            try {
+                const serialInput = document.getElementById('inputSlNo');
+                if (serialInput) {
+                    serialInput.value = await getGlobalSerial();
+                }
+            } catch (serialErr) {
+                console.error('Could not load global SL number after login:', serialErr);
+            }
             updateCert();
         } else {
             overlay.style.display = 'flex';
@@ -1107,53 +1118,44 @@
         }
     });
 
-    // Fetch the live student roster from Firestore. Falls back to the
-    // bundled SEED_STUDENTS (read-only, local) if Firestore is empty or
-    // unreachable, so the certificate tool still works before the one-time
-    // "Seed Database to Firebase" migration has been run.
-    //
-    // CACHING: pulling all ~1,200+ student docs on every single login was
-    // burning through the Firestore free-tier daily read quota very fast
-    // ("Quota exceeded" errors when printing/syncing the serial number).
-    // We now cache the roster in localStorage for a few hours so repeat
-    // logins on the same device/browser don't re-fetch everything each time.
+    // IMPORTANT: Do NOT download the entire students collection on login.
+    // A collection .get() reads every student document and can exhaust the
+    // Firestore daily quota. The bundled SEED_STUDENTS is the local index;
+    // Firestore is used for writes and the global serial counter only.
+    // Cached records are merged locally so imported/newer records on this
+    // browser remain available without another full-collection read.
     const STUDENT_CACHE_KEY = 'tfhs_students_cache';
     const STUDENT_CACHE_TIME_KEY = 'tfhs_students_cache_time';
-    const STUDENT_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
 
     async function loadStudentsFromFirestore(forceRefresh) {
         try {
-            if (!forceRefresh) {
+            const merged = new Map();
+
+            // Start with the bundled roster: zero Firestore reads.
+            SEED_STUDENTS.forEach(s => {
+                if (s && s.code) merged.set(String(s.code), s);
+            });
+
+            // Merge the local cache, if present. This preserves records added
+            // by PDF import on this browser without contacting Firestore.
+            try {
                 const cached = localStorage.getItem(STUDENT_CACHE_KEY);
-                const cachedTime = localStorage.getItem(STUDENT_CACHE_TIME_KEY);
-                const cacheAgeMs = cachedTime ? Date.now() - Number(cachedTime) : Infinity;
-                if (cached && cacheAgeMs < STUDENT_CACHE_MAX_AGE_MS) {
-                    try {
-                        STUDENTS = JSON.parse(cached);
-                        window.__usingFirestore = true;
-                        return;
-                    } catch (parseErr) {
-                        console.warn('Cached student list was corrupt, refetching:', parseErr);
+                if (cached) {
+                    const cachedStudents = JSON.parse(cached);
+                    if (Array.isArray(cachedStudents)) {
+                        cachedStudents.forEach(s => {
+                            if (s && s.code) merged.set(String(s.code), s);
+                        });
                     }
                 }
+            } catch (cacheErr) {
+                console.warn('Local student cache unavailable:', cacheErr);
             }
 
-            const snap = await db.collection('students').get();
-            if (snap.empty) {
-                STUDENTS = SEED_STUDENTS.slice();
-                window.__usingFirestore = false;
-            } else {
-                STUDENTS = snap.docs.map(d => d.data());
-                window.__usingFirestore = true;
-                try {
-                    localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(STUDENTS));
-                    localStorage.setItem(STUDENT_CACHE_TIME_KEY, String(Date.now()));
-                } catch (storageErr) {
-                    console.warn('Could not cache student list locally:', storageErr);
-                }
-            }
+            STUDENTS = Array.from(merged.values());
+            window.__usingFirestore = false;
         } catch (e) {
-            console.error('Firestore load failed, using local seed data:', e);
+            console.error('Local student roster load failed:', e);
             STUDENTS = SEED_STUDENTS.slice();
             window.__usingFirestore = false;
         }
@@ -1175,10 +1177,12 @@
                 });
                 await batch.commit();
             }
-            alert('Seeding complete. Reloading database from Firebase...');
-            await loadStudentsFromFirestore(true); // force refresh after seeding
+            // No full collection read after seeding. Keep the local roster.
+            STUDENTS = SEED_STUDENTS.slice();
+            window.__usingFirestore = false;
             populateStudentDatalist();
             updateDbStatus();
+            alert('Seeding complete. Firebase records are updated without re-reading the whole collection.');
         } catch (e) {
             alert('Seeding failed: ' + e.message);
         } finally {
@@ -1379,41 +1383,40 @@
         document.getElementById('autofetchStatus').innerText = '';
     }
 
-    // Global serial number — shared by ALL signed-in browsers/computers.
-    // Firestore transaction prevents two browsers from receiving the same
-    // number when printing at nearly the same time. Manual edits are allowed.
+    // GLOBAL SL SERIAL NUMBER
+    // The first/original SL number is 39. After printing 39, the next number
+    // becomes 40, then 41, etc. The Firestore transaction keeps all devices
+    // synchronized and prevents duplicate numbers during simultaneous prints.
     const SERIAL_SETTINGS_DOC = 'settings/documentLedger';
     const SERIAL_START = 39;
 
     async function getGlobalSerial() {
+        const ref = db.doc(SERIAL_SETTINGS_DOC);
         try {
-            const ref = db.doc(SERIAL_SETTINGS_DOC);
             const snap = await ref.get();
             if (snap.exists && Number.isFinite(Number(snap.data().nextSl))) {
-                return Number(snap.data().nextSl);
+                return Math.max(SERIAL_START, Number(snap.data().nextSl));
             }
-            await ref.set({ nextSl: SERIAL_START }, { merge: true });
+
+            await ref.set({
+                nextSl: SERIAL_START,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
             return SERIAL_START;
         } catch (e) {
             console.error('Global serial load failed:', e);
+            // Do not silently claim Firebase synchronization succeeded.
+            // Returning 39 lets the form remain usable while printing can
+            // still be blocked if the central counter cannot be reserved.
             return SERIAL_START;
         }
     }
 
-    window.addEventListener('DOMContentLoaded', async () => {
-        const input = document.getElementById('inputSlNo');
-        if (!input) return;
-        input.classList.add('manual-sl-input');
-        const sl = await getGlobalSerial();
-        input.value = sl;
-        updateCert();
-    });
-
     async function printAndIncrement() {
         const input = document.getElementById('inputSlNo');
         const manualSl = parseInt(input.value, 10);
-        if (!Number.isFinite(manualSl) || manualSl < 1) {
-            alert('Please enter a valid Sl No.');
+        if (!Number.isFinite(manualSl) || manualSl < SERIAL_START) {
+            alert(`Please enter a valid Sl No. (minimum ${SERIAL_START}).`);
             input.focus();
             return;
         }
@@ -1424,28 +1427,39 @@
         try {
             const ref = db.doc(SERIAL_SETTINGS_DOC);
             let printedSl;
+
             await db.runTransaction(async (tx) => {
                 const snap = await tx.get(ref);
                 const storedNext = snap.exists && Number.isFinite(Number(snap.data().nextSl))
-                    ? Number(snap.data().nextSl) : SERIAL_START;
-                // A manual entry is respected. The central counter is never
-                // allowed to move backwards, so other browsers remain safe.
+                    ? Math.max(SERIAL_START, Number(snap.data().nextSl))
+                    : SERIAL_START;
+
+                // Manual entry is allowed, but the central counter never
+                // moves backwards. This keeps every browser/device safe.
                 printedSl = manualSl;
                 const nextSl = Math.max(storedNext, manualSl + 1);
-                tx.set(ref, { nextSl: nextSl, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+                tx.set(ref, {
+                    nextSl,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
             });
 
             input.value = printedSl;
             updateCert();
             window.print();
 
-            // After printing, show the next globally reserved number.
+            // Show the next globally reserved number after printing.
             const next = await getGlobalSerial();
             input.value = next;
             updateCert();
         } catch (e) {
             console.error('Global serial update failed:', e);
-            alert('Serial number could not be synchronised with Firebase. Check Firestore Rules/connection.\n\n' + (e.message || e));
+            const msg = String(e && e.message || e);
+            if (/quota|resource-exhausted/i.test(msg)) {
+                alert('Firebase daily quota is exhausted. The code is correct, but Firebase has temporarily refused the counter update. The student roster no longer performs a full Firestore read, so this problem will not be caused by the 1,200+ student login load after deployment.');
+            } else {
+                alert('SL serial could not be synchronized with Firebase. Check Firebase Authentication, Firestore Rules, and the document settings/documentLedger.\n\n' + msg);
+            }
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = 'Print Document'; }
         }
