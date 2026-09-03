@@ -1062,7 +1062,8 @@
         projectId: "tfhs-portal",
         storageBucket: "tfhs-portal.firebasestorage.app",
         messagingSenderId: "316041012204",
-        appId: "1:316041012204:web:04ee8b19374c60f63716c9"
+        appId: "1:316041012204:web:04ee8b19374c60f63716c9",
+        measurementId: "G-0EKYFPQ1TB"
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -1110,8 +1111,33 @@
     // bundled SEED_STUDENTS (read-only, local) if Firestore is empty or
     // unreachable, so the certificate tool still works before the one-time
     // "Seed Database to Firebase" migration has been run.
-    async function loadStudentsFromFirestore() {
+    //
+    // CACHING: pulling all ~1,200+ student docs on every single login was
+    // burning through the Firestore free-tier daily read quota very fast
+    // ("Quota exceeded" errors when printing/syncing the serial number).
+    // We now cache the roster in localStorage for a few hours so repeat
+    // logins on the same device/browser don't re-fetch everything each time.
+    const STUDENT_CACHE_KEY = 'tfhs_students_cache';
+    const STUDENT_CACHE_TIME_KEY = 'tfhs_students_cache_time';
+    const STUDENT_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+    async function loadStudentsFromFirestore(forceRefresh) {
         try {
+            if (!forceRefresh) {
+                const cached = localStorage.getItem(STUDENT_CACHE_KEY);
+                const cachedTime = localStorage.getItem(STUDENT_CACHE_TIME_KEY);
+                const cacheAgeMs = cachedTime ? Date.now() - Number(cachedTime) : Infinity;
+                if (cached && cacheAgeMs < STUDENT_CACHE_MAX_AGE_MS) {
+                    try {
+                        STUDENTS = JSON.parse(cached);
+                        window.__usingFirestore = true;
+                        return;
+                    } catch (parseErr) {
+                        console.warn('Cached student list was corrupt, refetching:', parseErr);
+                    }
+                }
+            }
+
             const snap = await db.collection('students').get();
             if (snap.empty) {
                 STUDENTS = SEED_STUDENTS.slice();
@@ -1119,6 +1145,12 @@
             } else {
                 STUDENTS = snap.docs.map(d => d.data());
                 window.__usingFirestore = true;
+                try {
+                    localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(STUDENTS));
+                    localStorage.setItem(STUDENT_CACHE_TIME_KEY, String(Date.now()));
+                } catch (storageErr) {
+                    console.warn('Could not cache student list locally:', storageErr);
+                }
             }
         } catch (e) {
             console.error('Firestore load failed, using local seed data:', e);
@@ -1144,7 +1176,7 @@
                 await batch.commit();
             }
             alert('Seeding complete. Reloading database from Firebase...');
-            await loadStudentsFromFirestore();
+            await loadStudentsFromFirestore(true); // force refresh after seeding
             populateStudentDatalist();
             updateDbStatus();
         } catch (e) {
@@ -1917,6 +1949,14 @@ function updateCert() {
             STUDENTS.push(...toAdd);
             populateStudentDatalist();
             updateDbStatus();
+            // Keep the local cache in sync so a page reload within the cache
+            // window doesn't show a stale roster missing these new records.
+            try {
+                localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(STUDENTS));
+                localStorage.setItem(STUDENT_CACHE_TIME_KEY, String(Date.now()));
+            } catch (storageErr) {
+                console.warn('Could not update cached student list locally:', storageErr);
+            }
 
             setImportStatus(`Added ${toAdd.length} record(s) to Firebase. Available immediately on every signed-in device.`, '#1a6f1a');
             document.getElementById('addSelectedBtn').style.display = 'none';
