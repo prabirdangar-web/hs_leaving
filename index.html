@@ -695,7 +695,7 @@
     <div><strong>School Matrix System:</strong> Document Ledger (Reorganized Matrix Layout)</div>
     <div style="display:flex; gap:8px; align-items:center;">
         <span style="font-size:8pt; opacity:0.8;">Signed in: <span id="loggedInAs"></span></span>
-        <button class="import-btn" id="seedBtn" onclick="seedFirebaseDatabase()" title="One-time: upload the bundled records into Firebase">Seed Database to Firebase</button>
+        <button class="import-btn" id="seedBtn" onclick="seedFirebaseDatabase()" title="Upload the bundled student records into Firebase and mark the local index as migrated">Migrate / Sync Firebase</button>
         <button class="import-btn" onclick="openImportModal()">📄 Import PDF (TC Register)</button>
         <button class="print-btn" onclick="printAndIncrement()">Print Document</button>
         <button class="print-btn" style="background:#6b7280;" onclick="doLogout()">Sign Out</button>
@@ -753,7 +753,7 @@
     <div class="dashboard-panel">
         <div>
             <div class="panel-title">School Counterfoil / Foil Logs</div>
-            <div id="dbStatus" class="db-status">Database: nearly 1200 records | Years: 2020 to 2026</div>
+            <div id="dbStatus" class="db-status">Database: loading records | Years: 2020 to 2026</div>
 
             <div class="form-line-row" style="background:#fff3cd; padding:4px; border-radius:3px; border:1px solid #d4a017;">
                 <div class="form-group flex-3">
@@ -1126,18 +1126,22 @@
     // browser remain available without another full-collection read.
     const STUDENT_CACHE_KEY = 'tfhs_students_cache';
     const STUDENT_CACHE_TIME_KEY = 'tfhs_students_cache_time';
+    const FIREBASE_MIGRATED_KEY = 'tfhs_students_firebase_migrated';
 
     async function loadStudentsFromFirestore(forceRefresh) {
         try {
             const merged = new Map();
 
-            // Start with the bundled roster: zero Firestore reads.
+            // Keep the bundled roster as the zero-read local search index.
+            // Firestore is the cloud storage target; we deliberately do not
+            // download the whole collection on every login because this school
+            // roster contains 1,000+ records.
             SEED_STUDENTS.forEach(s => {
                 if (s && s.code) merged.set(String(s.code), s);
             });
 
-            // Merge the local cache, if present. This preserves records added
-            // by PDF import on this browser without contacting Firestore.
+            // Merge the local cache, preserving records added by PDF import
+            // on this browser without an additional Firestore collection read.
             try {
                 const cached = localStorage.getItem(STUDENT_CACHE_KEY);
                 if (cached) {
@@ -1153,40 +1157,84 @@
             }
 
             STUDENTS = Array.from(merged.values());
-            window.__usingFirestore = false;
+
+            // This flag means the bundled records have been successfully
+            // migrated/synced to Firebase, while the browser still uses the
+            // local index to avoid a costly full collection read.
+            window.__usingFirestore = localStorage.getItem(FIREBASE_MIGRATED_KEY) === '1';
         } catch (e) {
             console.error('Local student roster load failed:', e);
             STUDENTS = SEED_STUDENTS.slice();
-            window.__usingFirestore = false;
+            window.__usingFirestore = localStorage.getItem(FIREBASE_MIGRATED_KEY) === '1';
         }
     }
 
-    // One-time migration: uploads the bundled SEED_STUDENTS into Firestore
-    // (keyed by Student Code, so re-running is harmless/idempotent).
+    // One-time/ repeat-safe migration: uploads the bundled SEED_STUDENTS
+    // into Firestore, keyed by Student Code. Duplicate codes in the bundled
+    // array are collapsed before batching, so one Firestore document is
+    // written per unique student code.
     async function seedFirebaseDatabase() {
-        if (!confirm(`This uploads ${SEED_STUDENTS.length} existing records to Firebase so every device/browser shares the same live database. Safe to re-run. Continue?`)) return;
+        const uniqueMap = new Map();
+        SEED_STUDENTS.forEach(s => {
+            if (s && s.code) uniqueMap.set(String(s.code), s);
+        });
+        const records = Array.from(uniqueMap.values());
+
+        if (!confirm(
+            `This will sync ${records.length} unique student records to Firebase ` +
+            `(from ${SEED_STUDENTS.length} bundled rows).\n\n` +
+            `Existing Firebase documents with the same Student Code will be updated.\n` +
+            `Continue?`
+        )) return;
+
         const btn = document.getElementById('seedBtn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
+        if (btn) { btn.disabled = true; btn.textContent = 'Syncing...'; }
+
         try {
-            const chunkSize = 400;
-            for (let i = 0; i < SEED_STUDENTS.length; i += chunkSize) {
+            // Firestore batched writes: maximum 500 operations per batch.
+            const chunkSize = 450;
+            for (let i = 0; i < records.length; i += chunkSize) {
                 const batch = db.batch();
-                SEED_STUDENTS.slice(i, i + chunkSize).forEach(s => {
-                    if (!s.code) return;
-                    batch.set(db.collection('students').doc(String(s.code)), s, { merge: true });
+                records.slice(i, i + chunkSize).forEach(s => {
+                    batch.set(
+                        db.collection('students').doc(String(s.code)),
+                        s,
+                        { merge: true }
+                    );
                 });
                 await batch.commit();
             }
-            // No full collection read after seeding. Keep the local roster.
-            STUDENTS = SEED_STUDENTS.slice();
-            window.__usingFirestore = false;
+
+            // Keep the local index available without a full collection read.
+            STUDENTS = records.slice();
+            try {
+                localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(STUDENTS));
+                localStorage.setItem(STUDENT_CACHE_TIME_KEY, String(Date.now()));
+                localStorage.setItem(FIREBASE_MIGRATED_KEY, '1');
+            } catch (storageErr) {
+                console.warn('Could not save migration state/cache:', storageErr);
+            }
+
+            window.__usingFirestore = true;
             populateStudentDatalist();
             updateDbStatus();
-            alert('Seeding complete. Firebase records are updated without re-reading the whole collection.');
+
+            if (btn) btn.textContent = 'Firebase Synced';
+            alert(
+                `Firebase migration completed successfully.\n\n` +
+                `Bundled rows: ${SEED_STUDENTS.length}\n` +
+                `Unique Student Codes uploaded: ${records.length}\n\n` +
+                `The system will continue using the local search index to avoid ` +
+                `reading 1,000+ Firestore documents on every login.`
+            );
         } catch (e) {
-            alert('Seeding failed: ' + e.message);
+            console.error('Firebase migration failed:', e);
+            alert('Firebase migration failed: ' + (e && e.message ? e.message : e));
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Seed Database to Firebase'; }
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = window.__usingFirestore ? 'Firebase Synced' : 'Migrate / Sync Firebase';
+            }
         }
     }
 </script>
@@ -1195,7 +1243,9 @@
         const el = document.getElementById('dbStatus');
         if (!el || typeof STUDENTS === 'undefined') return;
         const years = [...new Set(STUDENTS.map(x => (x.leavingDate || '').split('-').pop()).filter(Boolean))].sort();
-        const src = window.__usingFirestore ? 'Firebase' : 'local seed (not yet migrated)';
+        const src = window.__usingFirestore
+            ? 'Firebase migrated / local search index'
+            : 'Local seed — Firebase migration pending';
         el.textContent = `Database: ${STUDENTS.length} records | Years: ${years.join(', ')} | Source: ${src}`;
     }
 </script>
